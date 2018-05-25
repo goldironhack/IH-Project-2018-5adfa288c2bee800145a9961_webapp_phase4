@@ -3,7 +3,7 @@ const DEATHS_URL ="https://data.cdc.gov/api/views/xbxb-epbu/rows.json?accessType
 const API_KEY ="AIzaSyDkBfoma7NvChlBTEcu0fZIuUs5lNKSQuI";
 
 const HOUSING_URL ="https://data.cityofnewyork.us/api/views/hg8x-zxpr/rows.json?accessType=DOWNLOAD";
-
+const NEIGHBOR_URL = "https://data.cityofnewyork.us/api/views/xyye-rtrs/rows.json?accessType=DOWNLOAD";
 
 var map;
 var university_coordinates={lat: 40.7291, lng: -73.9965};
@@ -133,7 +133,7 @@ function getRoute(){
         }
     });
 }
-
+var nyc = [];
 var distritos = [];
 var polydistritos = [];
 function getDistritos(){
@@ -143,7 +143,7 @@ function getDistritos(){
         var json = JSON.parse(data.responseText);
         var dataRow = json.features;
         for (var i = 0; i < dataRow.length; i++) {
-            distritos.push([dataRow[i].attributes.BoroCD,dataRow[i].geometry.rings.reverse()]);
+            distritos.push([dataRow[i].attributes.BoroCD,dataRow[i].geometry.rings.reverse(),0,[]]);
         }
         for (var j = 0; j < distritos.length; j++) {
             reversa = [];
@@ -161,18 +161,6 @@ function getDistritos(){
             });
             polydistritos.push(Distrito);
         }
-        /*
-        for (var k = 0; k<distritos.length;k++){
-            path = []
-            for (var l = 0; l<distritos[k][1].length;l++){
-                for (var m = 0; m<distritos[k][1][l].length;m++){
-                    path.push(distritos[k][1][l][m]);
-                }
-
-            }
-            polydistritos.push(path);
-        }
-        */
          console.log(polydistritos);
          console.log(distritos);
     })
@@ -181,44 +169,32 @@ function getDistritos(){
     });
 }
 getDistritos();
+
 setTimeout(function(){
-    console.log(distritos)
     for (var i = 0; i < housing.length; i++) {
-        var punto= {lat: 0, lng: 0};
-        punto.lat = housing[1];
-        punto.lng = housing[2];
-        if  (google.maps.geometry.poly.containsLocation(punto,polydistritos[0]) == true){
-            console.log("HERE");
+        var punto= housing[i][4];
+        for(var j = 0; j<polydistritos.length; j++){
+            if  (google.maps.geometry.poly.containsLocation(punto,polydistritos[j]) == true){
+                    distritos[j][2] = parseInt((distritos[j][2]+housing[i][3])/2);
+               j = polydistritos.length;
+            }
         }
     }
-    /*
-    for (var i = 0; i < housing.length; i++) {
-        for (var j = 0; j<distritos.length;j++){
-            pathsdistrito = []
-            for (var k = 0; j<distritos[j].length;k++){
-                
-            new google.maps.LatLng(25.774, -80.190),
-            new google.maps.LatLng(18.466, -66.118),
-            new google.maps.LatLng(32.321, -64.757)
-                }
-            var Distrito = new google.maps.Polygon({
-            paths: []
-            
-        });
-        }
-        
-        if  (google.maps.geometry.poly.containsLocation(event.latLng,bermudaTriangle) == true){
-            
-        }
-         google.maps.geometry.poly.containsLocatio
-        console.log(housing[i]);
-    }*/
     
-   // drawDistritos(distritos);
-    
+    for (var i = 0; i < neighborhood.length; i++) {
+        var punto= neighborhood[i][0];
+        for(var j = 0; j<polydistritos.length; j++){
+            if  (google.maps.geometry.poly.containsLocation(punto,polydistritos[j]) == true){
+                    distritos[j][3].push(neighborhood[i][1]);
+               j = polydistritos.length;
+            }
+        }
+    }
+
+    console.log(distritos);
+    console.log(housing);
+
 },2000);
-console.log(distritos);
-console.log(distritos[1]);
 /*
 var infoRows = [];
 function getData(){
@@ -254,9 +230,13 @@ function getHousing(){
         console.log(dataRow);
         //15 23 24 31
         for (var i = 0; i < dataRow.length; i++) {
-            if (dataRow[i][23] != null){
-            housing.push([dataRow[i][15],dataRow[i][23],dataRow[i][24],dataRow[i][31]]);
-            }
+            if(dataRow[i][23]!=null){
+            if (dataRow[i][31]!=0){
+                var borough = "";
+                borough = dataRow[i][19][3]+dataRow[i][19][4];
+                var c = new google.maps.LatLng(parseFloat(dataRow[i][23]),parseFloat(dataRow[i][24]));
+            housing.push([dataRow[i][15],dataRow[i][23],dataRow[i][24],parseInt(dataRow[i][31]),c]);
+            }}
         }
     })
     .fail(function(error){
@@ -264,10 +244,28 @@ function getHousing(){
     });
 }
 
+var neighborhood = [];
+function getNeigh(){
+  var data = $.get(NEIGHBOR_URL,function(){})
+    .done(function(){
+        var dataRow = data.responseJSON.data;
+        for (var i = 0; i < dataRow.length; i++) {
+            var punto = (dataRow[i][9].substr(7,(dataRow[i][9].length)-9)).split(" ");
+            var c = new google.maps.LatLng(parseFloat(punto[1]),parseFloat(punto[0]));
+            neighborhood.push([c,dataRow[i][10]]);
+            }
+        console.log(dataRow);
+        console.log(neighborhood);
+    })
+    .fail(function(error){
+        console.log(error);
+    });
+}
 
 
 $("document").ready(function(){
   getHousing();
+  getNeigh();
   //$("#getData").on("click",getDistritos)
   $("#exportData").click(function(){
   $("table").tableToCSV();
